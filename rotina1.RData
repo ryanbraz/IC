@@ -1,0 +1,145 @@
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(tidytext)
+library(wordcloud2)
+library(readxl)
+library(openxlsx)
+library(textdata)
+library(tidyr)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+library(widyr)
+library(igraph)
+library(ggraph)
+library(ggrepel)
+noticias <- rodar$texto
+china <- rodar$texto[rodar$pais == 'China']
+india <- rodar$texto[rodar$pais == 'India']
+names(rodar)
+glimpse(rodar)
+dim(rodar)
+fix(noticias)
+noticias <- sapply(noticias, tolower)
+removeSpecialChars <- function(x) gsub("[^a-zA-Z0-9 ]", " ", x)
+noticias <- sapply(noticias, removeSpecialChars)
+summary(rodar)
+my_colors <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#D55E00")
+theme_rodar <- function()
+{ theme(plot.title = element_text(hjust = 0.5),
+ axis.text.x = element_blank(),
+ axis.ticks = element_blank(),
+ panel.grid.major = element_blank(),
+ panel.grid.minor = element_blank(),
+ legend.position = "none") }
+noticias_por_ano <- rodar %>%
+  group_by(ano_rodar) %>%
+  summarise(number_of_texto = n())
+noticias_por_ano %>%
+  ggplot() +
+  geom_bar(aes(x = ano, y = number_of_texto), stat = "identity") +
+  theme(plot.title = element_text(hjust = 0.5),
+   legend.title = element_blank(),
+   panel.grid.minor = element_blank()) +
+  labs(x = NULL, y = "Nº de Notícias") +
+  ggtitle("Contagem de Notícias")
+
+noticias_por_ano <- rodar %>%
+ group_by(ano) %>%
+ summarise(number_of_texto = n())
+noticias_por_ano %>%
+ ggplot() +
+ geom_bar(aes(x = ano, y = number_of_texto), stat = "identity")
++
+ theme(plot.title = element_text(hjust = 0.5),
+  legend.title = element_blank(),
+  panel.grid.minor = element_blank()) +
+ labs(x = NULL, y = "Nº de Notícias") +
+ ggtitle("Contagem de Notícias por país")
+
+undesirable_words <- c("monday", "tuesday", "thursday", "wednesday", "friday",
+"saturday", "sunday", "reuters", "editor", "huaxia", "source",
+"told", "found", "january", "february", "march", "april",
+"may", "june", "july", "august", "september", "october", "november", "december","2014","2015","2016,"2017","2018","2019","2020","2021","from","don't")
+#nuvem de palavras
+head(sample(stop_words$word, 1000), 1000)
+noticias_tidy <- rodar %>%
+ unnest_tokens(word, texto) %>%
+ anti_join(stop_words) %>%
+ distinct() %>%
+ filter(!word %in% undesirable_words) %>%
+ filter(nchar(word) > 3)
+class(noticias_tidy)
+dim(noticias_tidy)
+fix(noticias_tidy)
+noticias_words_counts <- noticias_tidy %>%
+ count(word, sort = TRUE)
+wordcloud2(noticias_words_counts[1:300, ], size = .5)
+#análise de sentimentos
+install.packages("textdata")
+get_sentiments("afinn")
+get_sentiments("bing")
+get_sentiments("nrc")
+library(tidyr)
+noticias_bigrams <- noticias_tidy %>%
+unnest_tokens(bigram, word, token = "ngrams", n = 2)
+noticias_bigrams %>%
+count(bigram, sort = TRUE)
+bigrams_separated <- noticias_bigrams %>%
+separate(bigram, c("word1", "word2"), sep = " ")
+ bigrams_filtered <- bigrams_separated %>%
+ filter(!word1 %in% stop_words$word) %>%
+ filter(!word2 %in% stop_words$word) %>%
+ filter(!word1 %in% undesirable_words) %>%
+ filter(!word2 %in% undesirable_words)
+#Dicionário AFINN
+AFINN <- get_sentiments("afinn")
+brazil_words <- bigrams_filtered %>%
+  filter(word1 == "brazil") %>%
+  inner_join(AFINN, by = c(word2 = "word")) %>%
+  count(word2, value, sort = TRUE)
+brazil_words %>%
+ mutate(contribution = n * value) %>%
+ arrange(desc(abs(contribution))) %>%
+ head(50) %>%
+ ggplot(aes(word2, n * value, fill = n * value >= 0)) +
+ geom_col(show.legend = FALSE) +
+ xlab("Words preceded by \"brazil\"") +
+ ylab("Sentiment value * number of occurrences") +
+ coord_flip()
+brazilian_words <- bigrams_filtered %>%
+ filter(word1 == "brazilian") %>%
+ inner_join(AFINN, by = c(word2 = "word")) %>%
+ count(word2, value, sort = TRUE)
+brazilian_words %>%
+ mutate(contribution = n * value) %>%
+ arrange(desc(abs(contribution))) %>%
+ head(50) %>%
+ ggplot(aes(word2, n * value, fill = n * value >= 0)) +
+ geom_col(show.legend = FALSE) +
+ xlab("Words preceded by \"brazil\"") +
+ ylab("Sentiment value * number of occurrences") +
+ coord_flip()
+ #dicionário NRC
+noticias_bing <- noticias_tidy %>%
+ inner_join(get_sentiments("bing"))
+noticias_nrc <- noticias_tidy %>%
+ inner_join(get_sentiments("nrc"))
+noticias_nrc_sub <- noticias_tidy %>%
+ inner_join(get_sentiments("nrc")) %>%
+ filter(!sentiment %in% c("positive", "negative"))
+nrc_plot <- noticias_nrc %>%
+ group_by(sentiment) %>%
+ summarise(word_count = n()) %>%
+ ungroup() %>%
+ mutate(sentiment = reorder(sentiment, word_count)) %>%
+ ggplot(aes(sentiment, word_count, fill = -word_count)) +
+ geom_col() +
+ guides(fill = FALSE) + #Turn off the legend
+ theme_noticias() +
+ labs(x = NULL, y = "Word Count") +
+ scale_y_continuous(limits = c(0, 15000)) + #Hard code the axis limit
+ ggtitle("Speeches NRC Sentiment") +
+ coord_flip()
+plot(nrc_plot)

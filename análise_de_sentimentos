@@ -1,0 +1,94 @@
+
+install.packages("tidytext")
+install.packages("stringr")
+install.packages("tidyr")
+install.packages("ggplot2")
+install.packages("wordcloud2")
+install.packages("readxl")
+install.packages("openxlsx")
+install.packages("textdata")
+install.packages("igraph")
+install.packages("ggraph")
+install.packages("ggrepel")
+install.packages("tm")
+install.packages("foreign")
+install.packages("dplyr")
+install.packages("writexl")
+install.packages ("memery")
+install.packages ("magick")
+install.packages("circlize")
+install.packages("SentimentAnalysis")
+install.packages("tidyverse")
+install.packages("devtools")
+install.packages("widyr")
+
+library(widyr)
+library(devtools)
+library(tidyverse)
+library(SentimentAnalysis)
+library(circlize)
+library(memery)
+library(magick)
+library(writexl)
+library(dplyr)
+library(tidytext)
+library(stringr)
+library(tidyr)
+library(foreign)
+library(igraph)
+library(ggraph)
+library(ggrepel)
+library(tm)
+library(ggplot2)
+library(wordcloud2)
+library(readxl)
+library(openxlsx)
+library(textdata)
+
+
+
+
+ryan = rodar_2_ %>%
+  mutate(
+    text =
+      sapply(
+        texto,
+        stringi::stri_enc_toutf8,
+        is_unknown_8bit = TRUE,
+        validate = TRUE
+      )
+  ) %>%
+  unnest_tokens(
+    output = sentence,
+    input = texto,
+    token = 'sentences'
+  )
+
+
+ryan2 = ryan %>%
+  mutate(sentence_id = 1:n()) %>%
+  unnest_tokens(
+    output = word,
+    input = sentence,
+    token = 'words',
+    drop = FALSE
+  ) %>%
+  ungroup()
+
+ryan_sentiment = ryan2 %>%
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(sentence_id, sentence) %>%
+  ungroup()
+
+ryan_11<- ryan_sentiment %>%  select(pais, ano, sentence_id, value) %>% mutate(mean_value = value - mean(value, na.rm = TRUE)) %>% group_by(sentence_id)
+
+ryan_final_12 <- ryan_11 %>% group_by(sentence_id, pais, ano) %>% summarize(mean = mean(value))
+
+library(writexl)
+write_xlsx(ryan_final_12,"C:/Users/Paulo/Documents/Documents/Fernanda/ryan_sentimento.xlsx")
+
+sentimento_pais_ano <- ryan_final_12 %>% group_by(pais, ano) %>% summarize(sentimento = mean(mean))
+
+ggplot(sentimento_pais_ano, aes(ano, sentimento, group = pais)) +
+  geom_line(aes(color = pais))
+write_xlsx(sentimento_pais_ano,"C:/Users/Paulo/Documents/Documents/Fernanda/sentimento_pais_ano.xlsx")
