@@ -1,0 +1,135 @@
+install.packages("dplyr")
+library(dplyr)
+install.packages("tidytext")
+library(tidytext)
+install.packages("wordcloud2")
+library(wordcloud2)
+install.packages("readxl")
+library(readxl)
+install.packages("openxlsx")
+library(openxlsx)
+install.packages("textdata")
+library(textdata)
+install.packages("tidyr")
+library(tidyr)
+install.packages("knitr")
+library(knitr)
+install.packages("kableExtra")
+library(kableExtra)
+install.packages("widyr")
+library(widyr)
+install.packages("igraph")
+library(igraph)
+install.packages("ggraph")
+library(ggraph)
+install.packages("ggrepel")
+library(ggrepel)
+install.packages("tm")
+library(tm) 
+install.packages("SnowballC")
+library(SnowballC)
+install.packages("wordcloud")
+library(wordcloud)
+install.packages("cluster")
+library(cluster)
+install.packages("rpart")
+library(rpart)
+
+text_corpus <- Corpus(VectorSource(last$Title))
+text_corpus <- tm_map(text_corpus, tolower)
+text_corpus <- tm_map(text_corpus, stemDocument)
+text_corpus <- tm_map(text_corpus, removePunctuation)
+text_corpus <- tm_map(text_corpus, removeNumbers)
+text_corpus <- tm_map(text_corpus, removeWords, stopwords("english"))
+text_corpus <- tm_map(text_corpus, stripWhitespace)  
+title_matrix <- data.frame(text_clean = get("content", text_corpus), stringsAsFactors = FALSE)
+last_matrix <- cbind.data.frame(last, title_matrix)
+library(SentimentAnalysis)
+last_sentiment <- analyzeSentiment(last_matrix$text_clean)
+last_sentiment <- dplyr::select(last_sentiment, 
+                                 SentimentGI, SentimentHE,
+                                 SentimentLM, SentimentQDAP, 
+                                 WordCount)
+
+last_sentiment <- dplyr::mutate(last_sentiment, 
+                                 mean_sentiment = rowMeans(last_sentiment[,-14]))
+
+last_sentiment_positive<- convertToDirection(last_sentiment$SentimentGI)
+
+last_manchete_sentimento <- cbind.data.frame(last, last_sentiment)
+library(magrittr)
+library(dplyr)
+
+dados <- last_manchete_sentimento %>% mutate(signal = last_sentiment_positive)
+
+sinal <- dplyr::select(dados, WordCount, ID, Country, Newspaper, Year, Theme, signal)
+
+sinal_ano <- sinal %>% group_by(Year, signal) %>% summarize(count = n())
+
+ggplot(data = sinal_ano, mapping = aes(x=Year, y=count, fill=signal)) +
+  geom_bar(stat="identity", position = "dodge") +
+  scale_fill_brewer(palette="Set1")+
+  theme(plot.title = element_text(hjust = 0.5), legend.title = element_blank(), panel.grid.minor = element_blank()) +
+  labs(x = "Anos", y = "Número de Manchetes") +
+  ggtitle("Sentimento sobre a Amazônia brasileira na mídia estrangeira")+
+  scale_x_continuous(limits = c(2006, 2022), breaks = seq(2006, 2022, 1))+
+  scale_y_continuous(limits = c(0, 1000), breaks = seq(0, 1000, 50))
+
+ sinal_ano_porc<- sinal_ano %>% group_by(Year) %>% mutate(total = sum(count))
+
+sinal_ano_porc<- sinal_ano_porc %>% mutate(porc = count/total)
+
+ggplot(data = sinal_ano_porc, mapping = aes(x=Year, y=porc, fill=signal)) +
+  geom_line(aes(color =signal)) +
+  theme(plot.title = element_text(hjust = 0.3), legend.title = element_blank(), panel.grid.minor = element_blank()) +
+  labs(x = "Anos", y = "% de Manchetes") +
+  ggtitle("Sentimento sobre a Amazônia brasileira na mídia estrangeira (1995-2022)")+
+  scale_x_continuous(limits = c(1995, 2022), breaks = seq(1995, 2022, 1))+
+  scale_y_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.05))
+
+sinal_pais <- sinal %>% group_by(Country, signal) %>% summarize(count = n())
+
+sinal_pais_porc<- sinal_pais %>% group_by(Country) %>% mutate(total = sum(count))
+
+sinal_pais_porc<- sinal_pais_porc %>% mutate(porc = count/total)
+
+options(repr.plot.width = 800, repr.plot.height =500)
+ggplot(data = sinal_pais_porc, mapping = aes(x=Country, y=porc, fill=signal,fig(15,4))) +
+  geom_bar(stat="identity", position = "dodge") +
+  scale_fill_brewer(palette="Set1")+
+  theme(plot.title = element_text(hjust = 0.3), legend.title = element_blank(), panel.grid.minor = element_blank()) +
+  labs(x = "Países", y = "% de Manchetes") +
+  ggtitle("Sentimento sobre o Brasil por país")+
+  scale_y_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.05))
+ 
+
+sinal_tema <- sinal %>% group_by(Theme, signal) %>% summarize(count = n())
+
+sinal_tema_porc<- sinal_tema %>% group_by(Theme) %>% mutate(total = sum(count))
+
+sinal_tema_porc<- sinal_tema_porc %>% mutate(porc = count/total)
+
+sinal_tema_porc = sinal_tema_porc[-c(40),]
+
+ggplot(data = sinal_tema_porc, mapping = aes(x=Theme, y=porc, fill=signal)) +
+  geom_bar(stat="identity", position = "dodge") +
+  scale_fill_brewer(palette="Set1")+
+  theme(plot.title = element_text(hjust = 0.3), legend.title = element_blank(), panel.grid.minor = element_blank()) +
+  labs(x = "Temas", y = "% de Manchetes") +
+  ggtitle("Sentimento sobre a Amazônia brasileira por tema")+
+  scale_y_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.05))
+
+
+sinal_ano_separado<- tidyr::spread(sinal_ano, signal, count)
+
+sinal_ano_separado_final<- sinal_ano_separado %>% mutate(value = positive/negative)
+
+ggplot(data=sinal_ano_separado_final, aes(x=Year, y=value)) +
+  geom_line()+
+  geom_point()+
+  scale_y_continuous(limits = c(0.4, 1.7), breaks = seq(0.4, 1.7, 0.1))+
+scale_x_continuous(limits = c(1995, 2022), breaks = seq(1995, 2022, 1))+
+labs(x = "Anos", y = "Positivo/Negativo")
+
+library(writexl)
+write_xlsx(sinal_pais_porc,"/home/iriusp/IC/relatório final/brasil_pais.xlsx")
